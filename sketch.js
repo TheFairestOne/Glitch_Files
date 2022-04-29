@@ -1,81 +1,129 @@
-/* global createCanvas, colorMode, HSB, width, height, random, background, fill, color, random,
-          rect, ellipse, stroke, image, loadImage, collideCircleCircle, collideRectCircle, text, 
-          mouseX, mouseY, strokeWeight, line, mouseIsPressed, windowWidth, windowHeight, noStroke, 
-          keyCode, keyIsDown, generateInvaders, levelSelect, Ship, Invader, textAlign, RIGHT, CENTER, LEFT, constrain, UP_ARROW, LEFT_ARROW, RIGHT_ARROW, DOWN_ARROW, textSize, map */
+//Ball Pit. Click on objects to drag them around. Press a key to generate more balls.
+//by Chris Fair, September, 2020
 
-// Space Invaders by Chris Fair
-// September, 2020
+/* global createCanvas, Boundary, background, Bucket,generateBalls, collidePointCircle, collideCircleCircle, mouseX, mouseY,ellipse, ball1, Matter, colorMode, Ball, random, CENTER, HSB, fill, rectMode, rect,
+ */
 
-//TODO: import graphic for playerShip, import graphics for invaders, look into adding sound effects, make it so ships fire back at hire levels and add powerups
-//TOFIX:
-const HEIGHT = 600;
+// module aliases
+let Engine = Matter.Engine,
+  //Render = Matter.Render,
+  World = Matter.World,
+  Mouse = Matter.Mouse,
+  MouseConstraint = Matter.MouseConstraint,
+  Constraint = Matter.Constraint,
+  Bodies = Matter.Bodies;
+
+let engine;
+let world;
+let ball1;
+let ground;
+let leftWall;
+let rightWall;
 const WIDTH = 600;
-const RATE_OF_FIRE = 50;
-const SCALAR = 50;
-const ROWS = HEIGHT / SCALAR;
-const COLS = WIDTH / SCALAR;
-const NUM_INVADERS = 30;
-const invBaseHealth = 3;
-let laserV = 4;
-let invaderFleet = [];
-let playerShip;
-let gameIsOver = false;
-let playerScore = 0;
-let highScore = 0;
-let level = 1;
+const HEIGHT = 600;
+const NUM_BALLS = 50;
+let balls = [];
+let newBall;
+let boundaries = [];
+let mConstraint;
+let bucket = [];
 
 function setup() {
+  //using let canvas in order to access the mouse location for Mouse.create(canvas.elt)
+  let canvas = createCanvas(WIDTH, HEIGHT);
   colorMode(HSB);
-  createCanvas(WIDTH, HEIGHT);
-  playerShip = new Ship();
-  generateInvaders(invBaseHealth);
-}
+  engine = Engine.create();
+  world = engine.world;
 
+  Engine.run(engine);
+
+  boundaries.push(new Boundary(WIDTH / 2, HEIGHT, WIDTH, 100));
+  boundaries.push(new Boundary(0, HEIGHT / 2, 100, HEIGHT));
+  boundaries.push(new Boundary(WIDTH, HEIGHT / 2, 100, HEIGHT));
+
+  //World.add(world, [ground, leftWall, rightWall]);
+
+  bucket.push(new Bucket(WIDTH - 150, HEIGHT - 150, 120, 20));
+  bucket.push(new Bucket(WIDTH - 200, HEIGHT - 200, 20, 100));
+  bucket.push(new Bucket(WIDTH - 100, HEIGHT - 200, 20, 100));
+  //TODO: trying to make a bucket, still a work in progress
+  //   let optionsConstraint1 = {
+  //       bodyA:bucket[1].body,
+  //       bodyB:bucket[2].body,
+  //       length:100,
+  //       damping:0.1,
+  //       stiffness:1,
+  //       pointA: {
+  //         x:0,
+  //         y:-50
+  //       },
+  //       pointB: {x:0,y:-50}
+  //   }
+  //   let constraint1 = Constraint.create(optionsConstraint1);
+
+  //     let optionsConstraint2 = {
+  //       bodyA:bucket[1].body,
+  //       bodyB:bucket[2].body,
+  //       length:100,
+  //       damping:0.1,
+  //       stiffness:1,
+  //       pointA: {
+  //         x:0,
+  //         y:50
+  //       },
+  //       pointB: {x:0,y:50}
+  //   }
+  //   let constraint2 = Constraint.create(optionsConstraint2);
+
+  //     let optionsConstraint3 = {
+  //       bodyA:bucket[0].body,
+  //       bodyB:bucket[1].body,
+  //       length:1,
+  //       damping:0.1,
+  //       stiffness:1,
+  //       pointA: {
+  //         x:-50,
+  //         y:0
+  //       },
+  //       pointB: {x:0,y:-50}
+  //   }
+  //   let constraint3 = Constraint.create(optionsConstraint3);
+  //     let optionsConstraint4 = {
+  //       bodyA:bucket[0].body,
+  //       bodyB:bucket[2].body,
+  //       length:10,
+  //       damping:0.1,
+  //       stiffness:1,
+  //       pointA: {
+  //         x:50,
+  //         y:0
+  //       },
+  //       pointB: {x:0,y:-50}
+  //   }
+  //   let constraint4 = Constraint.create(optionsConstraint4);
+  //   World.add(world, constraint1, constraint2, constraint3, constraint4);
+
+  generateBalls();
+  let mouse = Mouse.create(canvas.elt);
+  let options = {
+    //mouse: canvasmouse
+  };
+  mConstraint = MouseConstraint.create(engine, options);
+  World.add(world, mConstraint);
+}
 function draw() {
-  background(20);
-  playerShip.display();
-  playerShip.gameOver();
-  if (gameIsOver === false) {
-    playerShip.move();
-    playerShip.attack();
-    playerShip.life();
-    for (let i = 0; i < invaderFleet.length; i++) {
-      invaderFleet[i].move();
-      invaderFleet[i].display();
-      invaderFleet[i].life();
-    }
-  } else {
-    fill(0, 80, 80);
-    textSize(36);
-    textAlign(CENTER, CENTER);
-    text("Game Over", WIDTH / 2, HEIGHT / 2);
-    textSize(16);
-    text("Press enter to play again", WIDTH / 2, HEIGHT / 2 + 30);
+  background(90);
+  for (let i = 0; i < boundaries.length; i++) {
+    boundaries[i].display();
   }
-  levelSelect();
-  displayScore();
+  for (let i = 0; i < bucket.length; i++) {
+    bucket[i].display();
+  }
+  for (let i = 0; i < balls.length; i++) {
+    balls[i].display();
+  }
 }
-
-function displayScore() {
-  //display score at the top of the screen
-  fill(40, 0.9);
-  rect(0, 0, WIDTH, 50);
-  fill(60, 80, 80);
-  textSize(12);
-  textAlign(LEFT, CENTER);
-  text("Score: " + playerScore, 10, 25);
-  textAlign(RIGHT, CENTER);
-  text("High Score: " + highScore, WIDTH - 50, 25);
-}
-
 function keyPressed() {
-  if (keyCode === 13) {
-    if ((gameIsOver = true)) {
-      gameIsOver = false;
-      playerScore = 0;
-      playerShip.health = 3;
-      level = 1;
-      generateInvaders(invBaseHealth);
-    }
-  }
+  newBall = new Ball(random(0, WIDTH), 20, 20, random(0, 360));
+  balls.push(newBall);
 }
